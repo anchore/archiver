@@ -238,6 +238,18 @@ func (t *Tar) untarNext(destination string) error {
 		return fmt.Errorf("checking path traversal attempt: %v", errPath)
 	}
 
+	switch header.Typeflag {
+	case tar.TypeSymlink, tar.TypeLink:
+		// though we've already checked the name for possible path traversals, it is possible
+		// to write content though a symlink to a path outside of the destination folder
+		// with multiple header entries. We should consider any symlink or hardlink that points
+		// to outside of the destination folder to be a possible path traversal attack.
+		errPath = t.CheckPath(destination, header.Linkname)
+		if errPath != nil {
+			return fmt.Errorf("checking path traversal attempt in symlink: %v", errPath)
+		}
+	}
+
 	if t.StripComponents > 0 {
 		if strings.Count(header.Name, "/") < t.StripComponents {
 			return nil // skip path with fewer components
