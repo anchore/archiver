@@ -13,14 +13,14 @@ import (
 )
 
 func requireDoesNotExist(t *testing.T, path string) {
-	_, err := os.Stat(path)
+	_, err := os.Lstat(path)
 	if err == nil {
 		t.Fatalf("'%s' expected to not exist", path)
 	}
 }
 
 func requireRegularFile(t *testing.T, path string) os.FileInfo {
-	fileInfo, err := os.Stat(path)
+	fileInfo, err := os.Lstat(path)
 	if err != nil {
 		t.Fatalf("fileInfo on '%s': %v", path, err)
 	}
@@ -60,7 +60,7 @@ func TestDefaultTar_Unarchive_HardlinkSuccess(t *testing.T) {
 func TestDefaultTar_Unarchive_SymlinkPathTraversal(t *testing.T) {
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source.tar")
-	createSymlinkPathTraversalSample(t, source)
+	createSymlinkPathTraversalSample(t, source, "./../target")
 	destination := filepath.Join(tmp, "destination")
 
 	err := archiver.DefaultTar.Unarchive(source, destination)
@@ -69,10 +69,25 @@ func TestDefaultTar_Unarchive_SymlinkPathTraversal(t *testing.T) {
 	}
 
 	requireDoesNotExist(t, filepath.Join(tmp, "target"))
-	requireRegularFile(t, filepath.Join(tmp, "destination", "symlinkvehicle.txt"))
+	requireRegularFile(t, filepath.Join(tmp, "destination", "duplicatedentry.txt"))
 }
 
-func createSymlinkPathTraversalSample(t *testing.T, archivePath string) {
+func TestDefaultTar_Unarchive_SymlinkPathTraversal_AbsLinkDestination(t *testing.T) {
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "source.tar")
+	createSymlinkPathTraversalSample(t, source, "/tmp/thing")
+	destination := filepath.Join(tmp, "destination")
+
+	err := archiver.DefaultTar.Unarchive(source, destination)
+	if err != nil {
+		t.Fatalf("unarchiving '%s' to '%s': %v", source, destination, err)
+	}
+
+	requireDoesNotExist(t, "/tmp/thing")
+	requireRegularFile(t, filepath.Join(tmp, "destination", "duplicatedentry.txt"))
+}
+
+func createSymlinkPathTraversalSample(t *testing.T, archivePath string, linkPath string) {
 	t.Helper()
 
 	type tarinfo struct {
@@ -83,8 +98,8 @@ func createSymlinkPathTraversalSample(t *testing.T, archivePath string) {
 	}
 
 	var infos = []tarinfo{
-		{"symlinkvehicle.txt", "./../target", "", tar.TypeSymlink},
-		{"symlinkvehicle.txt", "", "content modified!", tar.TypeReg},
+		{"duplicatedentry.txt", linkPath, "", tar.TypeSymlink},
+		{"duplicatedentry.txt", "", "content modified!", tar.TypeReg},
 	}
 
 	var buf bytes.Buffer

@@ -240,13 +240,19 @@ func (t *Tar) untarNext(destination string) error {
 
 	switch header.Typeflag {
 	case tar.TypeSymlink, tar.TypeLink:
+		// this covers cases when the link is an absolute path to a file outside the destination folder
+		if filepath.IsAbs(header.Linkname) {
+			errPath := &IllegalPathError{AbsolutePath: "", Filename: header.Linkname}
+			return fmt.Errorf("absolute path for symlink destination not allowed: %w", errPath)
+		}
+
 		// though we've already checked the name for possible path traversals, it is possible
 		// to write content though a symlink to a path outside of the destination folder
 		// with multiple header entries. We should consider any symlink or hardlink that points
 		// to outside of the destination folder to be a possible path traversal attack.
 		errPath = t.CheckPath(destination, header.Linkname)
 		if errPath != nil {
-			return fmt.Errorf("checking path traversal attempt in symlink: %v", errPath)
+			return fmt.Errorf("checking path traversal attempt in symlink: %w", errPath)
 		}
 	}
 
