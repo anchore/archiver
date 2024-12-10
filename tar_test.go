@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/mholt/archiver/v3"
+	"github.com/anchore/archiver/v3"
 )
 
 func requireDoesNotExist(t *testing.T, path string) {
